@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>批量放置过孔</title>
+
+    <style>
+        * {
+            margin: 2px;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: white;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .popup {
+            background: white;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .content {
+            padding: 15px;
+        }
+
+        .form-group {
+            margin-bottom: 10px;
+        }
+
+        .form-row {
+            display: flex;
+            gap: 10px;
+        }
+
+        .form-row .form-group {
+            flex: 1;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 14px;
+            color: #262626;
+        }
+
+        .form-input {
+            width: 100%;
+            height: 32px;
+            padding: 4px 12px !important;
+            border: 1px solid #d9d9d9;
+            font-size: 14px;
+            outline: none;
+        }
+
+        .form-input:focus {
+            border-color: #1890ff;
+            box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+        }
+
+        .form-input:hover {
+            border-color: #40a9ff;
+        }
+
+        .popup-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            padding: 0 15px 15px 15px;
+        }
+
+        .btn {
+            padding: 6px 20px;
+            font-size: 14px;
+            cursor: pointer;
+            border: 1px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background-color: #1890ff;
+            color: white;
+            border-color: #1890ff;
+        }
+
+        .btn-primary:hover {
+            background-color: #40a9ff;
+            border-color: #40a9ff;
+        }
+
+        .btn-secondary {
+            background-color: white;
+            color: #262626;
+            border-color: #d9d9d9;
+        }
+
+        .btn-secondary:hover {
+            border-color: #1890ff;
+            color: #1890ff;
+        }
+
+        .tip {
+            font-size: 12px;
+            color: #666;
+            line-height: 1.5;
+            margin-top: 4px;
+        }
+
+        .success-message {
+            color: #2e7d32;
+            font-size: 13px;
+            padding: 0 15px 10px 15px;
+            display: none;
+        }
+
+        .error-message {
+            color: #d32f2f;
+            font-size: 13px;
+            padding: 0 15px 10px 15px;
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="popup">
+
+    <div class="content">
+
+        <div class="form-group">
+            <label class="form-label">默认网络：</label>
+            <input id="defaultNet" class="form-input" type="text" value="GND" />
+        </div>
+
+        <div class="form-row">
+
+            <div class="form-group">
+                <label class="form-label">过孔内径（mil）：</label>
+                <input id="innerDiameter" class="form-input" type="number" value="12" min="1" />
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">过孔外径（mil）：</label>
+                <input id="outerDiameter" class="form-input" type="number" value="24" min="1" />
+            </div>
+
+        </div>
+
+        <div class="form-row">
+
+            <div class="form-group">
+                <label class="form-label">坐标单位：</label>
+
+                <select id="coordUnit" class="form-input">
+                    <option value="mm">mm</option>
+                    <option value="mil" selected>mil</option>
+                    <option value="inch">inch</option>
+                </select>
+            </div>
+
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">CSV 文件：</label>
+
+            <div class="tip">
+                支持格式：
+                <br>
+                R0201,169.05,102.76
+                <br>
+                R0201,169.05,102.76,GND
+            </div>
+
+            <div class="tip">
+                格式说明：
+                <br>
+                Name,X,Y
+                <br>
+                Name,X,Y,Net
+            </div>
+        </div>
+
+    </div>
+
+    <div class="popup-footer">
+        <button class="btn btn-secondary" onclick="undoVias()">撤回</button>
+        <button class="btn btn-primary" onclick="placeViasFromCSV()">开始放置</button>
+    </div>
+
+    <div id="successMessage" class="success-message"></div>
+    <div id="errorMessage" class="error-message"></div>
+
+</div>
+
+<script>
+
+    let isProcessing = false;
+
+    let viaIDs = [];
+
+    function showSuccess(message) {
+        const element = document.getElementById('successMessage');
+
+        element.textContent = message;
+        element.style.display = 'block';
+
+        setTimeout(() => {
+            element.style.display = 'none';
+        }, 3000);
+    }
+
+    function showError(message) {
+        const element = document.getElementById('errorMessage');
+
+        element.textContent = message;
+        element.style.display = 'block';
+
+        setTimeout(() => {
+            element.style.display = 'none';
+        }, 3000);
+    }
+
+    function convertToMil(value, unit) {
+
+        switch ((unit || 'mil').toLowerCase()) {
+
+            case 'mm':
+                return value * 39.3701;
+
+            case 'inch':
+                return value * 1000;
+
+            case 'mil':
+            default:
+                return value;
+        }
+    }
+
+    function splitCSVLine(line) {
+
+        const result = [];
+
+        let current = '';
+
+        let inQuotes = false;
+
+        for (let i = 0; i < line.length; i++) {
+
+            const ch = line[i];
+
+            if (ch === '"') {
+                inQuotes = !inQuotes;
+                continue;
+            }
+
+            if (ch === ',' && !inQuotes) {
+                result.push(current.trim());
+                current = '';
+            } else {
+                current += ch;
+            }
+        }
+
+        result.push(current.trim());
+
+        return result;
+    }
+
+function parseViaCSV(csvContent, coordUnit, defaultNet) {
+
+    const lines = csvContent
+        .replace(/\r\n/g, '\n')
+        .replace(/\r/g, '\n')
+        .split('\n');
+
+    const vias = [];
+
+    for (let i = 0; i < lines.length; i++) {
+
+        let line = lines[i].trim();
+
+        if (!line) {
+            continue;
+        }
+
+        // 去掉整行包裹引号
+        if (
+            line.startsWith('"') &&
+            line.endsWith('"')
+        ) {
+            line = line.substring(1, line.length - 1);
+        }
+
+        let cols = [];
+
+        // 自动识别分隔符
+        if (line.includes(',')) {
+
+            cols = line.split(',');
+
+        } else if (line.includes(';')) {
+
+            cols = line.split(';');
+
+        } else if (line.includes('\t')) {
+
+            cols = line.split('\t');
+
+        } else {
+
+            continue;
+        }
+
+        cols = cols.map(v =>
+            v.trim().replace(/^"|"$/g, '')
+        );
+
+        if (cols.length < 3) {
+            continue;
+        }
+
+        // 自动跳过表头
+        const first = cols[0].toLowerCase();
+
+        if (
+            first.includes('name') ||
+            first.includes('x') ||
+            first.includes('封装')
+        ) {
+            continue;
+        }
+
+        const name = cols[0];
+
+        let x = parseFloat(cols[1]);
+
+        let y = parseFloat(cols[2]);
+
+        if (
+            Number.isNaN(x) ||
+            Number.isNaN(y)
+        ) {
+            continue;
+        }
+
+        let net = defaultNet;
+
+        if (cols.length >= 4) {
+
+            const csvNet = cols[3].trim();
+
+            if (csvNet) {
+                net = csvNet;
+            }
+        }
+
+        x = convertToMil(x, coordUnit);
+        y = convertToMil(y, coordUnit);
+
+        vias.push({
+            name,
+            x,
+            y,
+            net
+        });
+    }
+
+    return vias;
+}
+
+    async function readCsvFile() {
+
+        const fileResult = await eda.sys_FileSystem.openReadFileDialog();
+
+        if (!fileResult) {
+            return null;
+        }
+
+        let file;
+
+        if (Array.isArray(fileResult)) {
+
+            if (fileResult.length === 0) {
+                return null;
+            }
+
+            file = fileResult[0];
+
+        } else {
+
+            file = fileResult;
+        }
+
+        if (!file || typeof file.text !== 'function') {
+            return null;
+        }
+
+        return await file.text();
+    }
+
+    async function placeViasFromCSV() {
+
+        if (isProcessing) {
+            return;
+        }
+
+        isProcessing = true;
+
+        try {
+
+            const csvContent = await readCsvFile();
+
+            if (!csvContent) {
+                showError('没有选择 CSV 文件');
+                return;
+            }
+
+            const defaultNet =
+                document.getElementById('defaultNet').value.trim() || 'GND';
+
+            const innerDiameter =
+                Number(document.getElementById('innerDiameter').value);
+
+            const outerDiameter =
+                Number(document.getElementById('outerDiameter').value);
+
+            const coordUnit =
+                document.getElementById('coordUnit').value;
+
+            if (!innerDiameter || !outerDiameter) {
+                showError('请输入正确的过孔尺寸');
+                return;
+            }
+
+            const vias = parseViaCSV(
+                csvContent,
+                coordUnit,
+                defaultNet
+            );
+
+            if (vias.length === 0) {
+                showError('CSV 中没有找到有效数据');
+                return;
+            }
+
+            showSuccess(`找到 ${vias.length} 个过孔坐标，开始放置...`);
+
+            let successCount = 0;
+
+            let failedCount = 0;
+
+            const failedItems = [];
+
+            for (let index = 0; index < vias.length; index++) {
+
+                const item = vias[index];
+
+                try {
+
+                    const viaID =
+                        await eda.pcb_PrimitiveVia.create(
+                            item.net,
+                            item.x,
+                            item.y,
+                            innerDiameter,
+                            outerDiameter
+                        );
+
+                    if (viaID && viaID.primitiveId) {
+                        viaIDs.push(viaID.primitiveId);
+                    }
+
+                    successCount++;
+
+                    if (index % 20 === 0) {
+                        await new Promise(resolve => setTimeout(resolve, 10));
+                    }
+
+                } catch (error) {
+
+                    failedCount++;
+
+                    failedItems.push(
+                        `${item.name} (${item.x}, ${item.y}) : ${error.message}`
+                    );
+                }
+            }
+
+            if (failedItems.length > 0) {
+
+                eda.sys_Log.add(
+                    `批量放置过孔失败详情 (共${failedItems.length}项):`
+                );
+
+                failedItems.forEach(item => {
+                    eda.sys_Log.add(`  ${item}`);
+                });
+            }
+
+            eda.sys_Dialog.showInformationMessage(
+                `批量放置完成！\n\n成功: ${successCount}\n失败: ${failedCount}` +
+                (failedItems.length > 0
+                    ? '\n\n详细失败信息请查看日志面板'
+                    : '')
+            );
+
+        } catch (error) {
+
+            showError(
+                '批量放置失败: ' + error.message
+            );
+
+        } finally {
+
+            isProcessing = false;
+        }
+    }
+
+    async function undoVias() {
+
+        if (isProcessing) {
+            return;
+        }
+
+        isProcessing = true;
+
+        try {
+
+            if (viaIDs.length === 0) {
+
+                showError('没有可撤回的过孔');
+
+                return;
+            }
+
+            await eda.pcb_PrimitiveVia.delete(viaIDs);
+
+            viaIDs = [];
+
+            showSuccess('已撤回全部已放置过孔');
+
+        } catch (error) {
+
+            showError(
+                '撤回失败: ' + error.message
+            );
+
+        } finally {
+
+            isProcessing = false;
+        }
+    }
+
+</script>
+
+</body>
+</html>

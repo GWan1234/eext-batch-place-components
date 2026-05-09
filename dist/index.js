@@ -25,6 +25,7 @@ var edaEsbuildExportName = (() => {
     activate: () => activate,
     batchPlaceFootprint: () => batchPlaceFootprint,
     batchPlaceSymbol: () => batchPlaceSymbol,
+    batchPlaceVias: () => batchPlaceVias,
     openLibrarySelector: () => openLibrarySelector
   });
   function activate(status, arg) {
@@ -328,6 +329,9 @@ var edaEsbuildExportName = (() => {
     eda.sys_Dialog.showInformationMessage(
       "\u6279\u91CF\u653E\u7F6E\u5143\u4EF6 v1.1.0\n\n\u652F\u6301CSV\u6587\u4EF6\u5BFC\u5165\u7684\u6279\u91CF\u653E\u7F6E\u5143\u4EF6\u5DE5\u5177\uFF0C\u5177\u5907\u667A\u80FD\u5355\u4F4D\u8F6C\u6362\u529F\u80FD\u3002\n\n\u529F\u80FD\uFF1A\n- \u6279\u91CF\u653E\u7F6EPCB\u5C01\u88C5\uFF08\u652F\u6301mm/mil\u5355\u4F4D\u81EA\u52A8\u8F6C\u6362\uFF09\n- \u6279\u91CF\u653E\u7F6E\u539F\u7406\u56FE\u7B26\u53F7\uFF08\u652F\u6301inch/mm\u5355\u4F4D\u81EA\u52A8\u8F6C\u6362\uFF09\n- \u667A\u80FD\u8BC6\u522BCSV\u8868\u5934\u4E2D\u7684\u5355\u4F4D\u4FE1\u606F\n- \u81EA\u52A8\u8FDB\u884C\u5355\u4F4D\u8F6C\u6362\u4EE5\u5339\u914DEDA\u5185\u90E8\u5750\u6807\u7CFB\u7EDF\n\nCSV\u683C\u5F0F\u793A\u4F8B\uFF1A\nName,X(mm),Y(mm)\n\u5143\u4EF6\u540D\u79F0,\u5750\u6807\u503C,\u5750\u6807\u503C"
     );
+  }
+  async function batchPlaceVias() {
+    await eda.sys_IFrame.openIFrame("/iframe/via-batch-place.html", 520, 520, "batchPlaceVias");
   }
   return __toCommonJS(src_exports);
 })();

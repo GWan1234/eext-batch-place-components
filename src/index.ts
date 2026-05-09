@@ -424,3 +424,7 @@ export function about(): void {
 		"批量放置元件 v1.1.0\n\n支持CSV文件导入的批量放置元件工具，具备智能单位转换功能。\n\n功能：\n- 批量放置PCB封装（支持mm/mil单位自动转换）\n- 批量放置原理图符号（支持inch/mm单位自动转换）\n- 智能识别CSV表头中的单位信息\n- 自动进行单位转换以匹配EDA内部坐标系统\n\nCSV格式示例：\nName,X(mm),Y(mm)\n元件名称,坐标值,坐标值",
 	);
 }
+
+export async function batchPlaceVias(): Promise<void> {
+    await eda.sys_IFrame.openIFrame('/iframe/via-batch-place.html', 520, 520, 'batchPlaceVias');
+}
